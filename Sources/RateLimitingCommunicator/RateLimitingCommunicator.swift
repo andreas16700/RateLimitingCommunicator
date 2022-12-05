@@ -7,11 +7,16 @@ import FoundationNetworking
 
 actor RLCommunicator{
     static let name = "Rate Limiting Communicator"
-    static let minDelayInMillies = 600
-	static let minDelayDuration: Duration = .milliseconds(minDelayInMillies)
-    static let shared = RLCommunicator()
-
-    private init(){}
+	let minDelayInMillies: Double
+	let minDelayDuration: Duration
+	init(minDelayInMillies: Double){
+		self.minDelayInMillies = minDelayInMillies
+		self.minDelayDuration = .milliseconds(minDelayInMillies)
+	}
+	init(minDelay: Duration){
+		self.minDelayDuration = minDelay
+		self.minDelayInMillies = minDelay.totalMillies()
+	}
     private var lastScheduledAt: DispatchTime?
     private var delayBeforeSendingNewRequest: Duration?{
         guard let lastScheduledAt else {
@@ -21,13 +26,13 @@ actor RLCommunicator{
 		print("lastScehduled at: "+timeStringWithMillies(date: lastScheduledAt))
 		#endif
 		if lastScheduledAt >= .now(){
-			let newDate = lastScheduledAt.advanced(by: .milliseconds(Self.minDelayInMillies))
+			let newDate = lastScheduledAt.advanced(by: .duration(d: minDelayDuration))
 			let delay = DispatchTime.now().distance(to: newDate)
 			return .dispatchTimeInterval(delay)
         }else{
 			let distanceToNow = lastScheduledAt.distance(to: .now())
 			let durationToNow:Duration = .dispatchTimeInterval(distanceToNow)
-			let delayOffsetDuration: Duration = Self.minDelayDuration - durationToNow
+			let delayOffsetDuration: Duration = minDelayDuration - durationToNow
 			let lastScheduleAffectsUs = delayOffsetDuration > .zero
 			return lastScheduleAffectsUs ? delayOffsetDuration : nil
         }
@@ -106,6 +111,9 @@ extension Duration{
 		let nanosFromSecondsComponent = components.seconds * 1_000_000_000
 		let totalInNanos = Int(inNanoSeconds+nanosFromSecondsComponent)
 		return totalInNanos
+	}
+	func totalMillies()->Double{
+		return Double(totalNanoSeconds()) / 1_000_000.0
 	}
 }
 extension DispatchTimeInterval{
