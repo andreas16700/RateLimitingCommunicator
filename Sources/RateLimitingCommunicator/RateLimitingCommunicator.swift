@@ -9,6 +9,7 @@ public actor RLCommunicator{
     static let name = "Rate Limiting Communicator"
 	let minDelayInMillies: Double
 	let minDelayDuration: Duration
+	static var isVerbose = false
 	public init(minDelayInMillies: Double){
 		self.minDelayInMillies = minDelayInMillies
 		self.minDelayDuration = .milliseconds(minDelayInMillies)
@@ -22,9 +23,9 @@ public actor RLCommunicator{
         guard let lastScheduledAt else {
             return nil
         }
-		#if DEBUG
-		print("lastScehduled at: "+timeStringWithMillies(date: lastScheduledAt, withNanoOffset: nanoOffset.uptimeNanoseconds))
-		#endif
+		if Self.isVerbose{
+			print("lastScehduled at: "+timeStringWithMillies(date: lastScheduledAt, withNanoOffset: nanoOffset.uptimeNanoseconds))
+		}
 		if lastScheduledAt >= .now(){
 			let newDate = lastScheduledAt.advanced(by: .duration(d: minDelayDuration))
 			let delay = DispatchTime.now().distance(to: newDate)
@@ -39,20 +40,22 @@ public actor RLCommunicator{
     }
 	@discardableResult
 	public func sendRequest<T>(_ request: () async throws->T)async throws->T{
-		#if DEBUG
 		let myID = UUID().uuidString.prefix(2)
-		printWithTimeInfoAsync("Called to send request <\(myID)>", withNanoOffset: nanoOffset.uptimeNanoseconds)
-		#endif
+		if Self.isVerbose{
+			printWithTimeInfoAsync("Called to send request <\(myID)>", withNanoOffset: nanoOffset.uptimeNanoseconds)
+		}
 		guard let delay = delayBeforeSendingNewRequest else{
-			#if DEBUG
-			printWithTimeInfoAsync("No delay, doing now request <\(myID)>", withNanoOffset: nanoOffset.uptimeNanoseconds)
-			#endif
+			if Self.isVerbose{
+				printWithTimeInfoAsync("No delay, doing now request <\(myID)>", withNanoOffset: nanoOffset.uptimeNanoseconds)
+			}
             lastScheduledAt = .now()
             return try await request()
         }
 		lastScheduledAt = .now().advanced(by: .duration(d: delay))
-		#if DEBUG && !os(Linux)
-		printWithTimeInfoAsync("Will wait \(delay.formatted(tmf)) for <\(myID)>", withNanoOffset: nanoOffset.uptimeNanoseconds)
+		#if !os(Linux)
+		if Self.isVerbose{
+			printWithTimeInfoAsync("Will wait \(delay.formatted(tmf)) for <\(myID)>", withNanoOffset: nanoOffset.uptimeNanoseconds)
+		}
 		#endif
         try await Task.sleep(for: delay)
         return try await request()
