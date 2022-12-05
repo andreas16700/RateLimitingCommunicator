@@ -9,11 +9,11 @@ public actor RLCommunicator{
     static let name = "Rate Limiting Communicator"
 	let minDelayInMillies: Double
 	let minDelayDuration: Duration
-	init(minDelayInMillies: Double){
+	public init(minDelayInMillies: Double){
 		self.minDelayInMillies = minDelayInMillies
 		self.minDelayDuration = .milliseconds(minDelayInMillies)
 	}
-	init(minDelay: Duration){
+	public init(minDelay: Duration){
 		self.minDelayDuration = minDelay
 		self.minDelayInMillies = minDelay.totalMillies()
 	}
@@ -38,7 +38,7 @@ public actor RLCommunicator{
         }
     }
 	@discardableResult
-	func sendRequest<T>(_ request: () async throws->T)async throws->T{
+	public func sendRequest<T>(_ request: () async throws->T)async throws->T{
 		#if DEBUG
 		let myID = UUID().uuidString.prefix(2)
 		printWithTimeInfoAsync("Called to send request <\(myID)>", withNanoOffset: nanoOffset.uptimeNanoseconds)
