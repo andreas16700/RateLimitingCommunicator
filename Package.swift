@@ -4,7 +4,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "RateLimittingCommunicator",
+    name: "RateLimitingCommunicator",
 	platforms: [
 		.macOS(.v13)
 	],
