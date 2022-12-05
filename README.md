@@ -1,2 +1,3 @@
 # RateLimitingCommunicator
-Swift actor that send async requests given a set delay between them.
+Swift actor that sends async requests given a set delay between them.
+
