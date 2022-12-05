@@ -5,7 +5,7 @@ import FoundationNetworking
 #endif
 
 
-actor RLCommunicator{
+public actor RLCommunicator{
     static let name = "Rate Limiting Communicator"
 	let minDelayInMillies: Double
 	let minDelayDuration: Duration
@@ -23,7 +23,7 @@ actor RLCommunicator{
             return nil
         }
 		#if DEBUG
-		print("lastScehduled at: "+timeStringWithMillies(date: lastScheduledAt))
+		print("lastScehduled at: "+timeStringWithMillies(date: lastScheduledAt, withNanoOffset: nanoOffset.uptimeNanoseconds))
 		#endif
 		if lastScheduledAt >= .now(){
 			let newDate = lastScheduledAt.advanced(by: .duration(d: minDelayDuration))
@@ -41,36 +41,36 @@ actor RLCommunicator{
 	func sendRequest<T>(_ request: () async throws->T)async throws->T{
 		#if DEBUG
 		let myID = UUID().uuidString.prefix(2)
-		printWithTimeInfoAsync("Called to send request <\(myID)>")
+		printWithTimeInfoAsync("Called to send request <\(myID)>", withNanoOffset: nanoOffset.uptimeNanoseconds)
 		#endif
 		guard let delay = delayBeforeSendingNewRequest else{
 			#if DEBUG
-			printWithTimeInfoAsync("No delay, doing now request <\(myID)>")
+			printWithTimeInfoAsync("No delay, doing now request <\(myID)>", withNanoOffset: nanoOffset.uptimeNanoseconds)
 			#endif
             lastScheduledAt = .now()
             return try await request()
         }
 		lastScheduledAt = .now().advanced(by: .duration(d: delay))
 		#if DEBUG && !os(Linux)
-		printWithTimeInfoAsync("Will wait \(delay.formatted(tmf)) for <\(myID)>")
+		printWithTimeInfoAsync("Will wait \(delay.formatted(tmf)) for <\(myID)>", withNanoOffset: nanoOffset.uptimeNanoseconds)
 		#endif
         try await Task.sleep(for: delay)
         return try await request()
 	}
 
 	@inlinable
-	func printWithTimeInfoAsync(_ message: String){
+	func printWithTimeInfoAsync(_ message: String, withNanoOffset nanoOffset: UInt64){
 		let n: DispatchTime = .now()
 		Task{
-			print("[\(timeStringWithMillies(date: n))] "+message)
+			print("[\(timeStringWithMillies(date: n, withNanoOffset: nanoOffset))] "+message)
 		}
 	}
 	
-	let nanoOffset: DispatchTime = .now()
+	private let nanoOffset: DispatchTime = .now()
 	
 	@inlinable
-	func timeStringWithMillies(date: DispatchTime)->String{
-		let ns = date.uptimeNanoseconds-nanoOffset.uptimeNanoseconds
+	func timeStringWithMillies(date: DispatchTime, withNanoOffset nanoOffset: UInt64)->String{
+		let ns = date.uptimeNanoseconds-nanoOffset
 		let minutes = ns / 60_000_000_000
 		let leftovers = ns % 60_000_000_000
 		let seconds = leftovers / 1_000_000_000
@@ -81,8 +81,8 @@ actor RLCommunicator{
 	}
 	
 	@inlinable
-	func currentTimeStringWithMillies()->String{
-		timeStringWithMillies(date: .now())
+	func currentTimeStringWithMillies(withNanoOffset nanoOffset: UInt64)->String{
+		timeStringWithMillies(date: .now(), withNanoOffset: nanoOffset)
 	}
 }
 #if !os(Linux)
