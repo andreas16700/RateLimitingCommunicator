@@ -6,10 +6,7 @@ import FoundationNetworking
 
 
 public actor RLCommunicator{
-    static let name = "Rate Limiting Communicator"
-	let minDelayInMillies: Double
-	let minDelayDuration: Duration
-	static var isVerbose = false
+	//MARK: Initializers
 	public init(minDelayInMillies: Double){
 		self.minDelayInMillies = minDelayInMillies
 		self.minDelayDuration = .milliseconds(minDelayInMillies)
@@ -18,6 +15,12 @@ public actor RLCommunicator{
 		self.minDelayDuration = minDelay
 		self.minDelayInMillies = minDelay.totalMillies()
 	}
+	//MARK: Properties
+	private let nanoOffset: DispatchTime = .now()
+	static let name = "Rate Limiting Communicator"
+	let minDelayInMillies: Double
+	let minDelayDuration: Duration
+	static var isVerbose = false
     private var lastScheduledAt: DispatchTime?
     private var delayBeforeSendingNewRequest: Duration?{
         guard let lastScheduledAt else {
@@ -38,8 +41,33 @@ public actor RLCommunicator{
 			return lastScheduleAffectsUs ? delayOffsetDuration : nil
         }
     }
+	struct ScheduledPayload{
+		var lastUpdated: Date
+		var method: () async throws->Any
+	}
+	private var toBeSent = [String: ScheduledPayload]()
+	private func getPayloadForRequest<R:Identifiable&LastUpdated>(for payload: R?)->(()async throws-> Any)?{
+		guard let payload else {return nil}
+		let payloadID = payload.id as? String ?? "\(payload.id)"
+		return toBeSent[payloadID]?.method
+	}
+	private func notePayloadRequest<R:Identifiable&LastUpdated>(for payload: R, method: @escaping ()async throws-> Any){
+		let payloadID = payload.id as? String ?? "\(payload.id)"
+		let payloadDate = payload.lastUpdatedDate
+		guard let current = toBeSent[payloadID] else {toBeSent[payloadID] = .init(lastUpdated: payloadDate, method: method);return}
+		guard payloadDate > current.lastUpdated else {
+			//item is older, ignore
+			return
+		}
+		toBeSent[payloadID]!.lastUpdated=payloadDate
+		toBeSent[payloadID]!.method=method
+	}
+	//MARK: Public
 	@discardableResult
-	public func sendRequest<T>(_ request: () async throws->T)async throws->T{
+	public func sendRequest<R:Identifiable&LastUpdated, T>(payload: R?, _ request: @escaping () async throws->T)async throws->T{
+		if let payload{
+			notePayloadRequest(for: payload, method: request)
+		}
 		let myID = UUID().uuidString.prefix(2)
 		if Self.isVerbose{
 			printWithTimeInfoAsync("Called to send request <\(myID)>", withNanoOffset: nanoOffset.uptimeNanoseconds)
@@ -48,17 +76,23 @@ public actor RLCommunicator{
 			if Self.isVerbose{
 				printWithTimeInfoAsync("No delay, doing now request <\(myID)>", withNanoOffset: nanoOffset.uptimeNanoseconds)
 			}
-            lastScheduledAt = .now()
-            return try await request()
-        }
+			lastScheduledAt = .now()
+			let method = getPayloadForRequest(for: payload) ?? request
+			return try await method() as! T
+		}
 		lastScheduledAt = .now().advanced(by: .duration(d: delay))
 		#if !os(Linux)
 		if Self.isVerbose{
 			printWithTimeInfoAsync("Will wait \(delay.formatted(tmf)) for <\(myID)>", withNanoOffset: nanoOffset.uptimeNanoseconds)
 		}
 		#endif
-        try await Task.sleep(for: delay)
-        return try await request()
+		try await Task.sleep(for: delay)
+		let method = getPayloadForRequest(for: payload) ?? request
+		return try await method() as! T
+	}
+	@discardableResult
+	public func sendRequest<T>(_ request: @escaping () async throws->T)async throws->T{
+		return try await sendRequest(payload: Optional<ShellLastUpdated>.none, request)
 	}
 
 	@inlinable
@@ -69,7 +103,7 @@ public actor RLCommunicator{
 		}
 	}
 	
-	private let nanoOffset: DispatchTime = .now()
+	
 	
 	@inlinable
 	func timeStringWithMillies(date: DispatchTime, withNanoOffset nanoOffset: UInt64)->String{
@@ -88,6 +122,15 @@ public actor RLCommunicator{
 		timeStringWithMillies(date: .now(), withNanoOffset: nanoOffset)
 	}
 }
+//MARK: General/Extensions
+public protocol LastUpdated{
+	var lastUpdatedDate: Date { get }
+}
+struct ShellLastUpdated: LastUpdated, Identifiable{
+	var lastUpdatedDate: Date = .now
+	var id: String = UUID().uuidString
+}
+
 #if !os(Linux)
 let tmf = Duration.TimeFormatStyle(pattern: .minuteSecond(padMinuteToLength: 2, fractionalSecondsLength: 6, roundFractionalSeconds: .toNearestOrEven))
 #endif

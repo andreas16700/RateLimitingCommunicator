@@ -58,6 +58,44 @@ final class RateLimitingCommunicatorTests: XCTestCase {
 		let delay: Duration = .milliseconds(600)
 		try await testSendMultiple(withDelay: delay, requestCount: 50)
 	}
+	func testSendMultipleUpdatedVersions()async throws{
+		struct Thing: LastUpdated, Identifiable, Equatable{
+			var id: String = .init(UUID().uuidString.prefix(2))
+			var lastUpdatedDate: Date = .now
+			var storage = 1
+			mutating func update(){
+				storage+=1
+				lastUpdatedDate = .now
+			}
+		}
+		let rl = RLCommunicator(minDelayInMillies: 1000)
+		@Sendable func receiveRequest(thing received: Thing)->Thing{
+			print("Received \(received.storage)")
+			return received
+		}
+		let stallCount = 1
+		Array(0..<stallCount).forEach{_ in Task{let _ = try await rl.sendRequest({})}}
+		var thing: Thing = .init()
+		let updateCount = 10
+		var tasks = [Task<Thing,Error>]()
+		for _ in 0..<updateCount{
+			thing.update()
+			let myPayload = thing
+			tasks.append(Task{
+				
+				print("Sending \(myPayload.storage)")
+				return try await rl.sendRequest(payload: myPayload) {
+					return receiveRequest(thing: myPayload)
+				}
+			})
+//				try await Task.sleep(for: .milliseconds(50))
+		}
+		print("Latest version: \(thing.storage)")
+		for task in tasks {
+			let v = try await task.value
+			XCTAssertEqual(v, thing)
+		}
+	}
 }
 extension Array where Element: FloatingPoint {
 
