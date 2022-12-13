@@ -168,6 +168,11 @@ extension DispatchTimeInterval{
 	}
 }
 #if os(Linux)
+extension Date{
+	static var now: Self{
+		Date()
+	}
+}
 extension DispatchTime{
 	func advanced(by ti: DispatchTimeInterval)->Self{
 		let base = self.uptimeNanoseconds
