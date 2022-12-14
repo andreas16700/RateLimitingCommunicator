@@ -169,7 +169,7 @@ extension DispatchTimeInterval{
 }
 #if os(Linux)
 extension Date{
-	static var now: Self{
+	public static var now: Self{
 		Date()
 	}
 }
