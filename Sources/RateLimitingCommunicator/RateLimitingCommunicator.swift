@@ -46,8 +46,8 @@ public actor RLCommunicator{
 		var method: () async throws->Any
 	}
 	private var toBeSent = [String: ScheduledPayload]()
-	private func getPayloadForRequest<R:Identifiable&LastUpdated>(for payload: R?)->(()async throws-> Any)?{
-		guard let payload else {return nil}
+	private func getPayloadForRequest<R>(for payload: R?)->(()async throws-> Any)?{
+		guard let payload=payload as? (any PayloadType) else {return nil}
 		let payloadID = payload.id as? String ?? "\(payload.id)"
 		return toBeSent[payloadID]?.method
 	}
@@ -63,9 +63,10 @@ public actor RLCommunicator{
 		toBeSent[payloadID]!.method=method
 	}
 	//MARK: Public
+	typealias PayloadType = Identifiable&LastUpdated
 	@discardableResult
-	public func sendRequest<R:Identifiable&LastUpdated, T>(payload: R?, _ request: @escaping () async throws->T)async throws->T{
-		if let payload{
+	public func sendRequest<R, T>(payload: R?, _ request: @escaping () async throws->T)async throws->T{
+		if let payload = payload as? (any PayloadType){
 			notePayloadRequest(for: payload, method: request)
 		}
 		let myID = UUID().uuidString.prefix(2)
