@@ -1,3 +1,4 @@
+public var versionOfRLCommunicator = 0.1
 import Dispatch
 import Foundation
 #if canImport(FoundationNetworking)
