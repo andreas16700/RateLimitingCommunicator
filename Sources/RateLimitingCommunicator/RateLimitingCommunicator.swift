@@ -21,7 +21,7 @@ public actor RLCommunicator{
 	static let name = "Rate Limiting Communicator"
 	let minDelayInMillies: Double
 	let minDelayDuration: Duration
-	static var isVerbose = false
+	static public var isVerbose = false
     private var lastScheduledAt: DispatchTime?
     private var delayBeforeSendingNewRequest: Duration?{
         guard let lastScheduledAt else {
