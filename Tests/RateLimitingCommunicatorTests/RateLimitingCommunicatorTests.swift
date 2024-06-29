@@ -1,7 +1,42 @@
 import XCTest
+import Dispatch
+
 @testable import RateLimitingCommunicator
 
 final class RateLimitingCommunicatorTests: XCTestCase {
+    
+    
+    func testNew()async throws{
+        
+        
+        let rl = RateLimitterWithUpdating(sendOp: {
+            try! await Task.sleep(for: .seconds(1))
+            print("[simulated sent for \($0)]")
+        })
+        
+        
+        let d = Date()
+        let ti = 0.5
+        
+        let stuff = Array(0...15).map{i in
+            let theDate = d.addingTimeInterval(ti*Double(i))
+            return ("\(i)", theDate)
+        }
+        
+        await withTaskGroup(of: Void.self, body: {g in
+            stuff.shuffled().forEach{(p,date) in
+                g.addTask {
+//                    print("[\(p)] Begin")
+                    await rl.add(p, date)
+//                    print("[\(p)] End")
+                }
+            }
+        })
+        
+        
+        
+    }
+    
 	/**
 	 How many ms it's acceptable for requests to deviate from the intented delay.
 	 For example:

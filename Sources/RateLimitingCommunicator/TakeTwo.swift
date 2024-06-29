@@ -9,74 +9,109 @@ import Dispatch
 import Foundation
 
 actor _RL{
-    init(sendOperation: @escaping (Payload) -> Void) {
-        self.sendOperation = sendOperation
+    init(minDelay: Duration = .milliseconds(500), sendOperation: @escaping (Payload) async -> Void) {
+        self.holder = .init(minDelay: minDelay, sendOperation: sendOperation)
     }
-    
+    let holder: PayloadHolder
     typealias Payload = String
     typealias PayloadWithDate = (Payload, Date)
-    let sendOperation: (Payload)async->()
-    var q: PayloadWithDate? = nil
-    var lastSent: DispatchTime? = nil
-    let delay: Duration = .milliseconds(650)
-    let verbose = true
-    
-    private var delayBeforeSendingNewRequest: Duration?{
-        guard let lastSent else {
-            return nil
-        }
-        if verbose{
-//            print("lastScehduled at: "+timeStringWithMillies(date: lastScheduledAt, withNanoOffset: nanoOffset.uptimeNanoseconds))
-        }
-//        precondition
-        guard lastSent < .now() else{
-            fatalError()
-        }
-//        how long ago was the last request sent?
-        let distanceToNow = lastSent.distance(to: .now())
-        let durationToNow:Duration = .dispatchTimeInterval(distanceToNow)
-        
-        let delayOffsetDuration: Duration = delay - durationToNow
-        
-        let lastScheduleAffectsUs = delayOffsetDuration > .zero
-        
-        return lastScheduleAffectsUs ? delayOffsetDuration : nil
-        
-    }
-    
-    
-    private func send()async{
-        guard let q else {fatalError()}
-        print("would send \(q.0) w date \(q.1)")
-        await sendOperation(q.0)
-    }
-    
-    private func trigger()async{
-        guard let lastSent else{
-//            send immediately
-            await send()
-            return
-        }
-//        wait
-        
-    }
-//    Add a payload to send. If one is already scheduled, replace it, iff this is newer.
-//
+
     var task: Task<(), Error>?
-    func add(_ t: PayloadWithDate){
-        guard let task else{
+    
+    actor PayloadHolder{
+        
+        init(minDelay: Duration, sendOperation: @escaping (Payload) async -> Void) {
+            self.delay = minDelay
+            self.sendOperation = sendOperation
+        }
+        
+        let sendOperation: (Payload)async->()
+        
+        
+        
+        var q: PayloadWithDate? = nil
+        
+        var lastSent: DispatchTime? = nil
+        let delay: Duration
+        
+        
+        var delayBeforeSendingNewRequest: Duration?{
+            guard let lastSent else {
+                return nil
+            }
+//            if verbose{
+    //            print("lastScehduled at: "+timeStringWithMillies(date: lastScheduledAt, withNanoOffset: nanoOffset.uptimeNanoseconds))
+//            }
+            
+    //        precondition
+            guard lastSent < .now() else{
+                fatalError()
+            }
+    //        how long ago was the last request sent?
+            let distanceToNow = lastSent.distance(to: .now())
+            let durationToNow:Duration = .dispatchTimeInterval(distanceToNow)
+            
+            let delayOffsetDuration: Duration = delay - durationToNow
+            
+            let lastScheduleAffectsUs = delayOffsetDuration > .zero
+            
+            return lastScheduleAffectsUs ? delayOffsetDuration : nil
+            
+        }
+        func sendNoDelay()async{
+            let p = q!.0
+            await sendOperation(p)
+//            print("Sent \(p)")
+            self.q = nil
             return
         }
-        guard let d = delayBeforeSendingNewRequest else{
-            return
-        }
-        self.task = Task{
-            try await Task.sleep(for: d)
-            await send()
+        func replaceIfNewer(with t: PayloadWithDate){
+            guard let current = self.q else {
+                self.q = t
+                print("Replaced [none] with \(t.0)")
+                return
+            }
+//            replace, if it's older than what I have planned
+            if current.1 < t.1{
+                print("Will replace \(current.0) with \(t.0) because it's newer than what's planned.")
+                self.q = t
+                print("Replaced \(current.0) with \(t.0)")
+            }else{
+                print("Ignored \(t.0) because it's older than what's planned.")
+            }
         }
     }
+    var planned = false
+    func plan(_ p: Payload) async{
+        guard !planned else{
+//            print("[\(p)] already planned")
+            return
+        }
+//        print("[\(p)] planning")
+        self.planned = true
+        guard let delayBeforeSendingNewRequest = await holder.delayBeforeSendingNewRequest else {
+            await holder.sendNoDelay()
+//            print("[\(p)] planning ended")
+            return
+        }
+        try! await Task.sleep(for: delayBeforeSendingNewRequest)
+        await holder.sendNoDelay()
+        self.planned = false
+//        print("[\(p)] planning ended")
+    }
+    func add(_ t: PayloadWithDate)async{
+        await holder.replaceIfNewer(with: t)
+        await plan(t.0)
+    }
+    
 }
 
-struct RL{
+struct RateLimitterWithUpdating{
+    init(sendOp: @escaping (_RL.Payload)async->()) {
+        self.rl = .init(sendOperation: sendOp)
+    }
     let rl: _RL
+    func add(_ s: _RL.Payload, _ d: Date)async{
+        await self.rl.add((s, d))
+    }
 }
