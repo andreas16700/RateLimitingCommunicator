@@ -9,7 +9,7 @@ final class RateLimitingCommunicatorTests: XCTestCase {
     func testNew()async throws{
         
         
-        let rl = RateLimitterWithUpdating(sendOp: {
+        let rl = RateLimitterWithUpdating<String>(sendOp: {
             try! await Task.sleep(for: .seconds(1))
             print("[simulated sent for \($0)]")
         })

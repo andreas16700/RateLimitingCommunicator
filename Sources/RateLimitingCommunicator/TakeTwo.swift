@@ -8,12 +8,12 @@
 import Dispatch
 import Foundation
 
-actor _RL{
+actor _RL<Payload>{
     init(minDelay: Duration = .milliseconds(500), sendOperation: @escaping (Payload) async -> Void) {
         self.holder = .init(minDelay: minDelay, sendOperation: sendOperation)
     }
     let holder: PayloadHolder
-    typealias Payload = String
+//    typealias Payload = String
     typealias PayloadWithDate = (Payload, Date)
 
     var task: Task<(), Error>?
@@ -106,12 +106,12 @@ actor _RL{
     
 }
 
-struct RateLimitterWithUpdating{
-    init(sendOp: @escaping (_RL.Payload)async->()) {
+struct RateLimitterWithUpdating<Payload>{
+    init(sendOp: @escaping (Payload)async->()) {
         self.rl = .init(sendOperation: sendOp)
     }
-    let rl: _RL
-    func add(_ s: _RL.Payload, _ d: Date)async{
+    let rl: _RL<Payload>
+    func add(_ s: Payload, _ d: Date)async{
         await self.rl.add((s, d))
     }
 }
