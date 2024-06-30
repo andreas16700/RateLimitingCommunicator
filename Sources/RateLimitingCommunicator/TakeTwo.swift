@@ -68,16 +68,16 @@ actor _RL<Payload>{
         func replaceIfNewer(with t: PayloadWithDate){
             guard let current = self.q else {
                 self.q = t
-                print("Replaced [none] with \(t.0)")
+//                print("Replaced [none] with \(t.0)")
                 return
             }
 //            replace, if it's older than what I have planned
             if current.1 < t.1{
-                print("Will replace \(current.0) with \(t.0) because it's newer than what's planned.")
+//                print("Will replace \(current.0) with \(t.0) because it's newer than what's planned.")
                 self.q = t
-                print("Replaced \(current.0) with \(t.0)")
+//                print("Replaced \(current.0) with \(t.0)")
             }else{
-                print("Ignored \(t.0) because it's older than what's planned.")
+//                print("Ignored \(t.0) because it's older than what's planned.")
             }
         }
     }
