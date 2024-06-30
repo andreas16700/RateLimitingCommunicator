@@ -106,7 +106,7 @@ actor _RL<Payload>{
     
 }
 
-struct RateLimitterWithUpdating<Payload>{
+public struct RateLimitterWithUpdating<Payload>{
     init(sendOp: @escaping (Payload)async->()) {
         self.rl = .init(sendOperation: sendOp)
     }
