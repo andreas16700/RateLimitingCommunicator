@@ -107,11 +107,11 @@ actor _RL<Payload>{
 }
 
 public struct RateLimitterWithUpdating<Payload>{
-    init(sendOp: @escaping (Payload)async->()) {
+    public init(sendOp: @escaping (Payload)async->()) {
         self.rl = .init(sendOperation: sendOp)
     }
     let rl: _RL<Payload>
-    func add(_ s: Payload, _ d: Date)async{
+    public func add(_ s: Payload, _ d: Date)async{
         await self.rl.add((s, d))
     }
 }
