@@ -91,6 +91,7 @@ actor _RL<Payload>{
         self.planned = true
         guard let delayBeforeSendingNewRequest = await holder.delayBeforeSendingNewRequest else {
             await holder.sendNoDelay()
+            self.planned = false
 //            print("[\(p)] planning ended")
             return
         }

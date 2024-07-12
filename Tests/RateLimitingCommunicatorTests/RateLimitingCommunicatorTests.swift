@@ -4,7 +4,110 @@ import Dispatch
 @testable import RateLimitingCommunicator
 
 final class RateLimitingCommunicatorTests: XCTestCase {
-    
+    func testRapidUpdating()async throws{
+        struct Payload{
+            var n: String = ""
+            var num: Int = 0
+            var str: String{
+                "\(n) \(num)"
+            }
+        }
+        let rl = RateLimitterWithUpdating<Payload>(sendOp: {
+            print("Sent \($0.str)")
+        })
+        var p = Payload()
+        var prev = Date.now
+        for i in 0..<50{
+            let d = Date.now
+            XCTAssertTrue(prev<d)
+            await rl.add(p, d)
+            p.n+="\(i)"
+            p.num+=i
+            prev = d
+        }
+        try await Task.sleep(for: .seconds(20))
+    }
+    func testLeastNumRemAfterKInts(){
+        class Solution {
+            func findLeastNumOfUniqueInts(_ arr: [Int], _ k: Int) -> Int {
+                let apps = arr.reduce(into: [Int: Int]()){d, n in
+                    d[n, default: 0]+=1
+                }
+                let keys = apps.keys.sorted(by: {apps[$0]!<apps[$1]!})
+                var sum = 0
+                var i = 0
+                while sum<k{
+                    var newNums = apps[keys[i]]!
+                    let difference = k-sum
+                    if newNums>difference{
+                        break
+                    }
+                    sum += newNums
+                    i+=1
+                }
+                return keys.count - i
+            }
+        }
+        let n = Solution().findLeastNumOfUniqueInts([5,5,5,4], 1)
+        XCTAssertEqual(n, 1)
+        
+        let n2 = Solution().findLeastNumOfUniqueInts([4,3,1,1,3,3,2], 3)
+        XCTAssertEqual(n2, 2)
+        /**
+         
+         
+         
+         2  x
+         4  x
+         1  xx
+         3  xxx
+         
+         
+         
+         */
+    }
+    func testElse(){
+        class Solution {
+            func findMedianSortedArrays(_ nums1: [Int], _ nums2: [Int]) -> Double {
+                let mergedSize = nums1.count + nums2.count
+                var elementIndices: [Int]
+                var medianElements = [Int]()
+                if mergedSize % 2 == 1{
+                    elementIndices = [mergedSize/2]
+                }else{
+                    elementIndices = [mergedSize/2, ((mergedSize/2) - 1)]
+                }
+                var i1=0
+                var i2=0
+                
+                var considerOnlyTwo=false
+                
+                for i in 0..<mergedSize{
+                    let currentNum: Int
+                    if considerOnlyTwo || nums1[i1] < nums2[i2]{
+                        currentNum = nums1[i1]
+                        if i1+1 < nums1.count{
+                            i1+=1
+                        }else{
+                            considerOnlyTwo=true
+                        }
+                    }else{
+                        currentNum = nums2[i2]
+                        i2+=1
+                    }
+                    if elementIndices.contains(i){
+                        medianElements.append(currentNum)
+                        if elementIndices.count == medianElements.count{
+                            break
+                        }
+                    }
+                }
+                return Double(medianElements.reduce(0, +))/Double(elementIndices.count)
+            }
+        }
+        let s = Solution().findMedianSortedArrays([1,2], [3,4])
+        print("\(s)")
+    }
     
     func testNew()async throws{
         
